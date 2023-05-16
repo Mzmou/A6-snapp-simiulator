@@ -265,18 +265,12 @@ void count_mission::calculate_mission(long long int start_time_stamp_, long long
 }
 void DataBase::show_mission_status(string driver_id_)
 {
-    try
+
+    Driver *target_driver = check_driver(driver_id_);
+    vector<Mission *> target_mission = target_driver->get_all_missions();
+    for (int i = 0; i < target_mission.size(); i++)
     {
-        Driver *target_driver = check_driver(driver_id_);
-        vector<Mission *> target_mission = target_driver->get_all_missions();
-        for (int i = 0; i < target_mission.size(); i++)
-        {
-            target_mission[i]->print_mission();
-        }
-    }
-    catch (string Error)
-    {
-        std::cerr << Error << '\n';
+        target_mission[i]->print_mission();
     }
 }
 void Mission::print_mission()
@@ -303,7 +297,7 @@ Driver *DataBase ::check_driver(string id)
         if (Drivers_data[i]->get_id() == id)
             return Drivers_data[i];
     }
-    throw DRIVER_MISSION_NOT_FOUND;
+    throw DriverMissionNotFound(DRIVER_MISSION_NOT_FOUND);
 }
 
 Mission *DataBase::check_mission(string mission_id_)
@@ -430,9 +424,9 @@ int main()
                 new_database.add_mission<time_mission>(arguments);
                 // new_database.add_mission(new time_mission(mission_id, start_time_stamp, end_time_stamp, stoi(time), stoi(reward)));
             }
-            catch (string Error)
+            catch (InvalidArgument &arguments_error)
             {
-                cout << Error << '\n';
+                arguments_error.print_error();
             }
             // cout << "OK";
         }
@@ -476,8 +470,21 @@ int main()
         {
             // string driver_id_ = "";
             //  cin >> driver_id_;
-            vector<string> arguments = new_database.read_input(2);
-            new_database.show_mission_status(arguments[1]);
+            try
+            {
+
+                vector<string> arguments = new_database.read_input(2);
+                new_database.show_mission_status(arguments[1]);
+            }
+            catch (InvalidArgument &arguments_error)
+            {
+                arguments_error.print_error();
+            }
+            catch (DriverMissionNotFound &driver_error)
+            {
+
+                driver_error.print_error();
+            }
         }
         if (command == "record_ride")
         {
