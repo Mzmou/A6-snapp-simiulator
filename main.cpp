@@ -1,17 +1,20 @@
 #include <iostream>
 #include <vector>
 #include <sstream>
+#include <map>
+#include <bits/stdc++.h>
 using namespace std;
 const string INVALID_ARGUMENTS = "INVALID_ARGUMENTS";
 const string MISSION_NOT_FOUND = "MISSION_NOT_FOUND";
 const string delim = " ";
 const string DRIVER_MISSION_NOT_FOUND = "DRIVER_MISSION_NOT_FOUND";
+const string DUPLICATE_MISSION_ID = "DUPLICATE_MISSION_ID";
 
 class Exception
 {
 public:
     Exception(string s) { set_err_sentence(s); }
-    void print_error() { cout << err_sentence; }
+    void print_error() { cout << err_sentence << '\n'; }
 
 protected:
     string err_sentence;
@@ -32,6 +35,11 @@ class DriverMissionNotFound : public Exception
 public:
     DriverMissionNotFound(string s) : Exception(s) { set_err_sentence(s); }
 };
+class DuplicateMissionId : public Exception
+{
+public:
+    DuplicateMissionId(string s) : Exception(s) { set_err_sentence(s); }
+};
 class Mission
 {
 public:
@@ -41,16 +49,22 @@ public:
     void set_reward(int r) { reward = r; }
     Mission(string mission_id_str_form, string start_time_stamp_str_form, string end_time_stamp_str_form, string r);
     Mission() { set_reward(0); }
-    virtual void print_mission() = 0;
+    void print_mission();
+    void print_mission(long long int end_time_stamp_);
+    virtual void calculate_mission(long long int start_time_stamp_, long long int end_time_stamp_, int distance_) = 0;
+    bool check_in_interval(long long int start_time_stamp_, long long int end_time_stamp_);
+    string get_status() { return status; }
 
 protected:
     string mission_id;
+    void set_status(string status_) { status = status_; }
     // string start_time_stamp;
     // string end_time_stamp;
-    long int start_time_stamp;
-    long int end_time_stamp;
+    long long int start_time_stamp;
+    long long int end_time_stamp;
     int reward;
     int id;
+    string status;
 };
 class distance_mission : public Mission
 {
@@ -68,7 +82,8 @@ public:
         set_distance(stoi(distance_));
     }
     ~distance_mission();
-    virtual void print_mission();
+
+    void calculate_mission(long long int start_time_stamp_, long long int end_time_stamp_, int distance_);
 };
 class time_mission : public Mission
 {
@@ -91,7 +106,8 @@ public:
         set_time(0);
     }
     ~time_mission();
-    void virtual print_mission();
+
+    virtual void calculate_mission(long long int start_time_stamp_, long long int end_time_stamp_, int distance_);
 };
 class count_mission : public Mission
 {
@@ -109,7 +125,8 @@ public:
             throw INVALID_ARGUMENTS;
         set_count(stoi(count_));
     }
-    virtual void print_mission();
+
+    void calculate_mission(long long int start_time_stamp_, long long int end_time_stamp_, int distance_);
     ~count_mission();
 };
 class Driver
@@ -120,12 +137,15 @@ public:
         driver_id = id_;
         add_misssion_assignment(mission_);
     }
+    int get_number_of_missions() { return all_mission.size(); }
     string get_id() { return driver_id; }
     void add_misssion_assignment(Mission *mission_)
     {
         all_mission.push_back(mission_);
     }
     vector<Mission *> get_all_missions() { return all_mission; }
+
+    vector<map<Mission *, vector<long long int>>> end_times;
 
 private:
     string driver_id;
@@ -139,35 +159,26 @@ public:
     void add_time_mission(time_mission *c) { time_mission_data.push_back(c); }
     void add_distance_mission(distance_mission *c) { distance_mission_data.push_back(c); }
     void assign_mission(string mission_id_, string driver_id);
+    vector<string> read_input(int number_of_arguments);
     vector<Driver *> get_drivers_data() { return Drivers_data; }
     Mission *check_mission(string mission_id_);
+    void check_duplicate_id(string mission_id);
     template <typename T>
-    void add_mission()
+    void add_mission(vector<string> arguments)
     {
-        string arguments_str_form;
-        getline(cin, arguments_str_form);
-        stringstream arguments_str_form_ss(arguments_str_form);
-
-        vector<string> arguments;
-        string token;
-        int space_counter = 0;
-        size_t pos = 0;
-        int i = 0;
-        while (getline(arguments_str_form_ss, token, ' '))
+        try
         {
-            arguments.push_back(token);
+            // vector<string> arguments = read_input(6);
+            //  cout << "Id is " << arguments[1] << '\n';
+            check_duplicate_id(arguments[1]);
+            if (stoll(arguments[2]) < stol(arguments[3]))
+                throw InvalidArgument(INVALID_ARGUMENTS);
+            total_mission.push_back(new T(arguments[1], arguments[2], arguments[3], arguments[4], arguments[5]));
         }
-        // string mission_id_ = "", start_time_stamp_ = "", end_time_stamp_ = "", distance_ = "", mission_quality_ = "";
-        if (arguments.size() < 6)
-            throw INVALID_ARGUMENTS;
-        // cout<<"jdsj"<< arguments.size()<<'\n';
-        // for(int i=0;i<arguments.size();i++)
-        // cout<<arguments[i]<<' ';
-        // cin >> mission_id_ >> start_time_stamp_ >> end_time_stamp_ >> distance_ >> mission_quality_;
-        // arguments.resize(6);
-        // cout<<arguments[1]<<"jdsfjsfd\n";
-
-        total_mission.push_back(new T(arguments[1], arguments[2], arguments[3], arguments[4], arguments[5]));
+        catch (DuplicateMissionId &mission_error)
+        {
+            mission_error.print_error();
+        }
     }
 
     void add_driver_mission(string id, Mission *mission_);
@@ -175,6 +186,7 @@ public:
     vector<count_mission *> get_count_mission_data() { return count_mission_data; }
     vector<Mission *> total_mission;
     void show_mission_status(string driver_id_);
+    void record_drive(vector<string> arguments);
 
 private:
     vector<count_mission *> count_mission_data;
@@ -183,6 +195,74 @@ private:
     // friend ostream &operator<<(ostream &out, vector<count_mission *> count_mission_data);
     vector<Driver *> Drivers_data;
 };
+/*
+
+*/
+void DataBase::record_drive(vector<string> arguments)
+{
+
+    Driver *target_driver = check_driver(arguments[3]);
+    vector<Mission *> target_missions = target_driver->get_all_missions();
+    target_driver->end_times.resize(target_missions.size());
+    for (int i = 0; i < target_missions.size(); i++)
+    {
+        cout << "completed mission for driver " << arguments[3] << ":\n";
+        if (target_missions[i]->check_in_interval(stoll(arguments[1]), stoll(arguments[2])) && target_missions[i]->get_status() == "ongoing")
+        {
+            //  cout << "the interval is ok\n";
+            target_missions[i]->calculate_mission(stoll(arguments[1]), stoll(arguments[2]), stoi(arguments[4]));
+            target_driver->end_times[i][target_missions[i]].push_back(stoll(arguments[2]));
+            if (target_missions[i]->get_status() == "completed")
+            {
+                vector<long long int> v = target_driver->end_times[i][target_missions[i]];
+                //  *max_element(v.begin(), v.end());
+                target_missions[i]->print_mission(*max_element(v.begin(), v.end()));
+                cout << '\n';
+            }
+        }
+    }
+    /*
+
+
+    cout << "completed mission for driver " << arguments[3] << ":\n";
+    for (int i = 0; i < target_missions.size(); i++)
+    {
+        if (target_missions[i]->get_status() == "completed")
+        {
+            vector<long long int> v = target_driver->end_times[i][target_missions[i]];
+            //  *max_element(v.begin(), v.end());
+            target_missions[i]->print_mission(*max_element(v.begin(), v.end()));
+        }
+    }
+    for (int i = target_missions.size() - 1; i >= 0; i--)
+    {
+        if (target_missions[i]->get_status() == "completed")
+        {
+            target_missions.erase(target_missions.begin() + i);
+            target_driver->end_times.erase(target_driver->end_times.begin() + i);
+        }
+    }
+    */
+}
+
+void distance_mission::calculate_mission(long long int start_time_stamp_, long long int end_time_stamp_, int distance_)
+{
+    distance = distance - distance_;
+    if (distance <= 0)
+        set_status("completed");
+}
+void time_mission::calculate_mission(long long int start_time_stamp_, long long int end_time_stamp_, int distance_)
+{
+    time = time - (start_time_stamp_ - end_time_stamp_);
+    if (time <= 0)
+        set_status("completed");
+}
+void count_mission::calculate_mission(long long int start_time_stamp_, long long int end_time_stamp_, int distance_)
+{
+    count = count - 1;
+    if (count <= 0)
+        set_status("completed");
+}
 void DataBase::show_mission_status(string driver_id_)
 {
     try
@@ -199,32 +279,22 @@ void DataBase::show_mission_status(string driver_id_)
         std::cerr << Error << '\n';
     }
 }
-void distance_mission::print_mission()
+void Mission::print_mission()
 {
-    cout << "mission" << mission_id << ":" << '\n';
+    cout << "mission " << mission_id << ":" << '\n';
     cout << "start_time_stamp: " << start_time_stamp << '\n';
     cout << "end_time_stamp: " << end_time_stamp << '\n';
     cout << "reward: " << reward << '\n';
     cout << "status: "
-         << "completed" << '\n';
+         << get_status() << '\n';
 }
-void count_mission::print_mission()
+
+void Mission::print_mission(long long int end_time_stamp_)
 {
-    cout << "mission" << mission_id << ":" << '\n';
+    cout << "mission " << mission_id << ":" << '\n';
     cout << "start_time_stamp: " << start_time_stamp << '\n';
-    cout << "end_time_stamp: " << end_time_stamp << '\n';
+    cout << "end_time_stamp: " << end_time_stamp_ << '\n';
     cout << "reward: " << reward << '\n';
-    cout << "status: "
-         << "completed" << '\n';
-}
-void time_mission::print_mission()
-{
-    cout << "mission" << mission_id << ":" << '\n';
-    cout << "start_time_stamp: " << start_time_stamp << '\n';
-    cout << "end_time_stamp: " << end_time_stamp << '\n';
-    cout << "reward: " << reward << '\n';
-    cout << "status: "
-         << "completed" << '\n';
 }
 Driver *DataBase ::check_driver(string id)
 {
@@ -243,7 +313,7 @@ Mission *DataBase::check_mission(string mission_id_)
         if (total_mission[i]->get_mission_id() == mission_id_)
             return total_mission[i];
     }
-    throw MISSION_NOT_FOUND;
+    throw MissionNotFound(MISSION_NOT_FOUND);
 }
 void DataBase::add_driver_mission(string id, Mission *mission_)
 {
@@ -261,15 +331,9 @@ void DataBase::add_driver_mission(string id, Mission *mission_)
 }
 void DataBase::assign_mission(string mission_id_, string driver_id_)
 {
-    try
-    {
-        Mission *mission_target = check_mission(mission_id_);
-        add_driver_mission(driver_id_, mission_target);
-    }
-    catch (string Error)
-    {
-        cerr << Error << '\n';
-    }
+
+    Mission *mission_target = check_mission(mission_id_);
+    add_driver_mission(driver_id_, mission_target);
 }
 /*
 
@@ -283,16 +347,53 @@ void DataBase ::add_mission()
 }
 */
 
+void DataBase ::check_duplicate_id(string mission_id_)
+{
+
+    for (int i = 0; i < total_mission.size(); i++)
+    {
+        if (total_mission[i]->get_mission_id() == mission_id_)
+        {
+            throw DuplicateMissionId(DUPLICATE_MISSION_ID);
+        }
+    }
+}
 Mission::Mission(string mission_id_str_form, string start_time_stamp_str_form, string end_time_stamp_str_form, string reward_)
 {
     // if (mission_id == "" || start_time_stamp_str_form == "" || end_time_stamp_str_form == "" || reward_ == "")
     //  throw INVALID_ARGUMENTS;
     mission_id = mission_id_str_form;
-    start_time_stamp = stol(start_time_stamp_str_form);
-    end_time_stamp = stol(end_time_stamp_str_form);
+    start_time_stamp = stoll(start_time_stamp_str_form);
+    end_time_stamp = stoll(end_time_stamp_str_form);
+    status = "ongoing";
     set_reward(stoi(reward_));
     if (end_time_stamp < start_time_stamp || reward < 0)
         throw INVALID_ARGUMENTS;
+}
+vector<string> DataBase::read_input(int number_of_arguments)
+{
+    string arguments_str_form;
+    getline(cin, arguments_str_form);
+    stringstream arguments_str_form_ss(arguments_str_form);
+    vector<string> arguments;
+    string token;
+    // int space_counter = 0;
+    // size_t pos = 0;
+    // int i = 0;
+    while (getline(arguments_str_form_ss, token, ' '))
+    {
+        arguments.push_back(token);
+    }
+    // string mission_id_ = "", start_time_stamp_ = "", end_time_stamp_ = "", distance_ = "", mission_quality_ = "";
+    if (arguments.size() < number_of_arguments)
+        throw InvalidArgument(INVALID_ARGUMENTS);
+    return arguments;
+}
+bool Mission ::check_in_interval(long long int start_time_stamp_, long long int end_time_stamp_)
+{
+    if (start_time_stamp_ > start_time_stamp && end_time_stamp_ < end_time_stamp)
+        return true;
+    return false;
 }
 
 int main()
@@ -308,12 +409,13 @@ int main()
             // cin >> mission_id >> start_time_stamp >> end_time_stamp >> target_number >> reward;
             try
             {
-                new_database.add_mission<count_mission>();
+                vector<string> arguments = new_database.read_input(6);
+                new_database.add_mission<count_mission>(arguments);
                 // new_database.add_mission(new count_mission(mission_id, start_time_stamp, end_time_stamp, stoi(target_number), stoi(reward)));
             }
-            catch (string Error)
+            catch (InvalidArgument &arguments_error)
             {
-                cout << Error << '\n';
+                arguments_error.print_error();
             }
             // cout << "OK";
         }
@@ -324,7 +426,8 @@ int main()
             try
             {
                 // time_mission t;
-                new_database.add_mission<time_mission>();
+                vector<string> arguments = new_database.read_input(6);
+                new_database.add_mission<time_mission>(arguments);
                 // new_database.add_mission(new time_mission(mission_id, start_time_stamp, end_time_stamp, stoi(time), stoi(reward)));
             }
             catch (string Error)
@@ -340,41 +443,46 @@ int main()
             // cin >> mission_id_ >> start_time_stamp_ >> end_time_stamp_ >> distance_ >> reward_;
             try
             {
-                new_database.add_mission<distance_mission>();
+                vector<string> arguments = new_database.read_input(6);
+                new_database.add_mission<distance_mission>(arguments);
                 //  new_database.add_mission(new distance_mission(mission_id, start_time_stamp, end_time_stamp, stoi(distance), stoi(reward)));
             }
-            catch (string Error)
+            catch (InvalidArgument &arguments_error)
             {
-                cout<<Error;
+                arguments_error.print_error();
             }
             // cout << "OK";
         }
         if (command == "assign_mission")
         {
-            string mission_id = "", driver_id = "";
-            cin >> mission_id >> driver_id;
-            new_database.assign_mission(mission_id, driver_id);
+            // string mission_id = "", driver_id = "";
+            // cin >> mission_id >> driver_id;
+            try
+            {
+
+                vector<string> arguments = new_database.read_input(3);
+                new_database.assign_mission(arguments[1], arguments[2]);
+            }
+            catch (InvalidArgument &arguments_error)
+            {
+                arguments_error.print_error();
+            }
+            catch (MissionNotFound &mission_error)
+            {
+                mission_error.print_error();
+            }
         }
         if (command == "show_missions_status")
         {
-            string driver_id_ = "";
-            cin >> driver_id_;
+            // string driver_id_ = "";
+            //  cin >> driver_id_;
+            vector<string> arguments = new_database.read_input(2);
+            new_database.show_mission_status(arguments[1]);
         }
-
-        // vector<count_mission *> djkj = new_database.get_count_mission_data();
-
-        for (int i = 0; i < new_database.total_mission.size(); i++)
+        if (command == "record_ride")
         {
-            new_database.total_mission[i]->print_mission();
-        }
-        vector<Driver *> driver = new_database.get_drivers_data();
-        for (int i = 0; i < driver.size(); i++)
-        {
-            vector<Mission *> m = driver[i]->get_all_missions();
-            for (int j = 0; j < m.size(); j++)
-                m[j]->print_mission();
+            vector<string> arguments = new_database.read_input(5);
+            new_database.record_drive(arguments);
         }
     }
-
-    cout << "hi";
 }
